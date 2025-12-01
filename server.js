@@ -1,66 +1,48 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-import { RtcTokenBuilder, RtcRole } from "agora-access-token";
-
-dotenv.config();
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const { RtcTokenBuilder, RtcRole } = require("agora-token");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Load from .env
 const APP_ID = process.env.APP_ID;
-const APP_CERTIFICATE = process.env.APP_CERTIFICATE;
+const APP_CERT = process.env.APP_CERT;
 
-if (!APP_ID || !APP_CERTIFICATE) {
-  console.error("❌ ERROR: Missing APP_ID or APP_CERTIFICATE in .env");
+if (!APP_ID || !APP_CERT) {
+  console.error("❌ ERROR: Missing APP_ID or APP_CERT in environment variables");
   process.exit(1);
 }
 
-// Root test
-app.get("/", (req, res) => {
-  res.send("Agora Token Server is running ✔");
-});
-
-// Correct route
-app.get("/rtcToken", (req, res) => {
+app.get("/generateToken", (req, res) => {
   const channelName = req.query.channelName;
-  const uid = Number(req.query.uid || 0);
+  const uid = req.query.uid || 0;
 
   if (!channelName) {
     return res.status(400).json({ error: "channelName is required" });
   }
 
   const role = RtcRole.PUBLISHER;
-  const expireSeconds = 3600;
+  const expireTime = 3600;
 
-  const currentTimestamp = Math.floor(Date.now() / 1000);
-  const privilegeExpire = currentTimestamp + expireSeconds;
+  const token = RtcTokenBuilder.buildTokenWithUid(
+    APP_ID,
+    APP_CERTIFICATE,
+    channelName,
+    uid,
+    role,
+    expireTime
+  );
 
-  try {
-    const token = RtcTokenBuilder.buildTokenWithUid(
-      APP_ID,
-      APP_CERTIFICATE,
-      channelName,
-      uid,
-      role,
-      privilegeExpire
-    );
-
-    return res.json({
-      rtcToken: token,
-      channelName,
-      uid,
-      expiresAt: privilegeExpire,
-    });
-  } catch (err) {
-    console.error("Token generation error:", err);
-    return res.status(500).json({ error: err.message });
-  }
+  res.json({
+    token,
+    channelName,
+    uid,
+  });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Agora Token Server running on port ${PORT}`);
 });
